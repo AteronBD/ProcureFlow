@@ -17,6 +17,10 @@
     "react": "latest",
     "react-dom": "latest",
     "tailwind-merge": "latest",
-    "tailwindcss": "^4.0.0"
+    "tailwindcss": "^4.0.0",
+    "typescript": "latest",
+    "@types/react": "latest",
+    "@types/node": "latest",
+    "@types/react-dom": "latest"
   }
 }

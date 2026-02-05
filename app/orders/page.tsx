@@ -131,4 +131,53 @@ export default function SiparisTakipPage() {
               {Array.from({ length: 42 }).map((_, i) => {
                 const dayNum = i - (firstDayOfMonth(currentDate.getFullYear(), currentDate.getMonth()) - 0) + 1;
                 const isCurrentMonth = dayNum > 0 && dayNum <= daysInMonth(currentDate.getFullYear(), currentDate.getMonth());
-                const dateStr = `${
+                const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                const dayItems = allItems.filter(item => item.delivery_date === dateStr);
+
+                return (
+                  <div key={i} className={`min-h-[100px] p-2 bg-white flex flex-col gap-1 overflow-y-auto ${!isCurrentMonth ? 'bg-slate-50/50 grayscale' : ''}`}>
+                    {isCurrentMonth && <span className="text-xs font-bold text-slate-400 mb-1">{dayNum}</span>}
+                    {isCurrentMonth && dayItems.map((item, idx) => (
+                      <div key={idx} className="px-2 py-1 rounded-md text-[9px] font-bold text-white truncate shadow-sm cursor-help" style={{ backgroundColor: item.color_code }} title={`${item.description} (${item.quantity} ${item.unit_type})`}>
+                        {item.description}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DÜZENLEME VE YENİ KAYIT MODALI (Ondalıklı Sayı Destekli) */}
+      {(isModalOpen || (isDetailOpen && editMode)) && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[300] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-5xl p-10 shadow-2xl overflow-y-auto max-h-[95vh]">
+             {/* Form içeriği ondalıklı sayı destekli parseFloat ve step="0.1" içerecek şekilde düzenlendi */}
+             <form onSubmit={handleSave} className="space-y-6 text-left">
+                <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-black">{editMode ? 'Düzenle' : 'Yeni Sipariş'}</h2><button onClick={() => {setIsModalOpen(false); setIsDetailOpen(false);}}><X size={32}/></button></div>
+                <input required value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Tedarikçi" className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold mb-4" />
+                <table className="w-full">
+                    <thead><tr className="text-[10px] font-black text-slate-400 border-b"><th>Malzeme</th><th>Birim</th><th>Miktar</th><th>Deadline</th><th>Renk</th><th></th></tr></thead>
+                    <tbody>
+                        {items.map((it, idx) => (
+                            <tr key={idx} className="py-2">
+                                <td><input required value={it.description} onChange={e => {const n = [...items]; n[idx].description = e.target.value; setItems(n);}} className="w-full bg-transparent outline-none p-2 font-medium" /></td>
+                                <td><select value={it.unit_type} onChange={e => {const n = [...items]; n[idx].unit_type = e.target.value; setItems(n);}} className="bg-slate-50 p-2 rounded-lg text-xs font-bold"><option value="adet">Adet</option><option value="litre">Litre</option><option value="metre">Metre</option></select></td>
+                                <td><input type="number" step="0.01" value={it.qty} onChange={e => {const n = [...items]; n[idx].qty = parseFloat(e.target.value) || 0; setItems(n);}} className="w-20 bg-slate-50 p-2 rounded-lg font-bold" /></td>
+                                <td><input type="date" required value={it.delivery_date} onChange={e => {const n = [...items]; n[idx].delivery_date = e.target.value; setItems(n);}} className="p-2 bg-slate-50 rounded-lg text-xs font-bold text-blue-600" /></td>
+                                <td><input type="color" value={it.color_code} onChange={e => {const n = [...items]; n[idx].color_code = e.target.value; setItems(n);}} className="w-8 h-8 rounded-full border-0 p-0 cursor-pointer" /></td>
+                                <td><button type="button" onClick={() => setItems(items.filter((_,i) => i !== idx))}><Trash2 size={18} className="text-red-300" /></button></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <div className="flex justify-between pt-6"><button type="button" onClick={() => setItems([...items, {description:'', qty:1, unit_type:'adet', delivery_date:'', color_code:'#3b82f6'}])} className="text-blue-600 font-bold bg-blue-50 px-6 py-3 rounded-xl">+ Ekle</button><button disabled={loading} className="bg-slate-900 text-white px-12 py-3 rounded-xl font-black">{loading ? '...' : 'Kaydet'}</button></div>
+             </form>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

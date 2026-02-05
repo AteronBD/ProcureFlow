@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase'; // Az önce oluşturduğumuz dosya
 
 export default function Dashboard() {
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchOrders() {

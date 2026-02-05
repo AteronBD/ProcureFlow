@@ -1,138 +1,193 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Save, X, ShoppingBag } from 'lucide-react';
+import { 
+  Package, Clock, X, Trash2, Check, Plus, Save, ShoppingBag 
+} from 'lucide-react';
 
-export default function OrderCreatePage() {
-  // Sadece gerekli alanlar kaldı: Açıklama, Adet ve Birim Fiyat
-  const [items, setItems] = useState([{ description: '', qty: 1, unit_price: 0 }]);
+export default function OrdersPage() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Çoklu Ürün Form State'i
+  const [items, setItems] = useState([{ description: '', qty: 1, unit_price: 0 }]);
+  const [supplierName, setSupplierName] = useState('');
 
-  const addRow = () => {
-    setItems([...items, { description: '', qty: 1, unit_price: 0 }]);
-  };
+  useEffect(() => { fetchOrders(); }, []);
 
-  const removeRow = (index: number) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
-    }
-  };
+  async function fetchOrders() {
+    const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+    if (!error) setOrders(data);
+  }
 
-  const handleInputChange = (index: number, field: string, value: any) => {
+  // Yeni Satır Ekle/Sil
+  const addRow = () => setItems([...items, { description: '', qty: 1, unit_price: 0 }]);
+  const removeRow = (index: number) => items.length > 1 && setItems(items.filter((_, i) => i !== index));
+
+  const handleItemChange = (index: number, field: string, value: any) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
   };
 
-  const calculateTotal = () => {
-    return items.reduce((acc, curr) => acc + (curr.qty * curr.unit_price), 0);
+  const calculateTotal = () => items.reduce((acc, curr) => acc + (curr.qty * curr.unit_price), 0);
+
+  // İKİ AŞAMALI KAYIT SİSTEMİ
+  const handleSaveOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    const total = calculateTotal();
+    const orderNo = `PR-${1480 + orders.length + 1}`;
+
+    // 1. Ana Siparişi Kaydet
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert([{ 
+        order_no: orderNo, 
+        supplier: supplierName, 
+        amount: `₺${total.toLocaleString()}`,
+        status: 'Beklemede' 
+      }])
+      .select();
+
+    if (!orderError && orderData) {
+      // 2. Sipariş Kalemlerini (Items) Kaydet
+      const orderId = orderData[0].id;
+      const itemsToInsert = items.map(item => ({
+        order_id: orderId,
+        description: item.description,
+        quantity: item.qty,
+        unit_price: item.unit_price
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
+      
+      if (!itemsError) {
+        setIsModalOpen(false);
+        setItems([{ description: '', qty: 1, unit_price: 0 }]);
+        setSupplierName('');
+        fetchOrders();
+      }
+    }
+    setLoading(false);
+  };
+
+  const updateStatus = async (id: string, newStatus: string) => {
+    await supabase.from('orders').update({ status: newStatus }).eq('id', id);
+    fetchOrders();
+  };
+
+  const deleteOrder = async (id: string) => {
+    if(confirm('Silmek istediğinize emin misiniz?')) {
+      await supabase.from('orders').delete().eq('id', id);
+      fetchOrders();
+    }
   };
 
   return (
-    <main className="p-8 space-y-6 text-left animate-in fade-in duration-700">
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 relative overflow-hidden">
-        {/* Dekoratif Arka Plan İkonu */}
-        <div className="absolute right-[-30px] top-[-30px] opacity-[0.03] text-slate-900 rotate-12">
-          <ShoppingBag size={300} />
+    <main className="p-8 space-y-8 text-left animate-in fade-in duration-500">
+      <header className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-black text-slate-800">Sipariş Yönetimi</h1>
+          <p className="text-slate-500 font-medium">Tüm satın alma taleplerini buradan yönetin.</p>
         </div>
+        <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-200 transition-all flex items-center gap-2">
+          <Plus size={20} /> Yeni Talep Oluştur
+        </button>
+      </header>
 
-        <div className="relative z-10">
-          <div className="flex justify-between items-center mb-10 border-b border-slate-50 pb-6">
-            <div>
-              <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Satın Alma Talebi</h2>
-              <p className="text-slate-400 font-medium text-sm mt-1">Sipariş kalemlerini aşağıya ekleyin.</p>
-            </div>
-            <div className="text-right">
-              <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Talep Numarası</span>
-              <span className="text-xl font-mono font-bold text-blue-600">PR-1481</span>
-            </div>
-          </div>
-
-          {/* Ürün Tablosu */}
-          <table className="w-full mb-8">
-            <thead>
-              <tr className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
-                <th className="pb-5 text-left pl-2">Ürün / Hizmet Açıklaması</th>
-                <th className="pb-5 text-center w-32">Miktar</th>
-                <th className="pb-5 text-right w-40">Birim Fiyat</th>
-                <th className="pb-5 text-right w-40">Toplam</th>
-                <th className="pb-5 text-right pr-2 w-20"></th>
+      {/* Sipariş Listesi Tablosu */}
+      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50/50">
+            <tr className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+              <th className="p-6 pl-8">No</th>
+              <th className="p-6">Tedarikçi</th>
+              <th className="p-6">Durum</th>
+              <th className="p-6">Toplam Tutar</th>
+              <th className="p-6 text-right pr-8">İşlemler</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {orders.map((order) => (
+              <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group">
+                <td className="p-6 pl-8 font-bold text-blue-600">{order.order_no}</td>
+                <td className="p-6 font-bold text-slate-700">{order.supplier}</td>
+                <td className="p-6">
+                  <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${
+                    order.status === 'Onaylandı' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {order.status}
+                  </span>
+                </td>
+                <td className="p-6 font-black text-slate-900">{order.amount}</td>
+                <td className="p-6 text-right pr-8 space-x-2">
+                  {order.status === 'Beklemede' && (
+                    <button onClick={() => updateStatus(order.id, 'Onaylandı')} className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all"><Check size={18} /></button>
+                  )}
+                  <button onClick={() => deleteOrder(order.id)} className="p-2 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18} /></button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {items.map((item, index) => (
-                <tr key={index} className="group hover:bg-slate-50/50 transition-colors">
-                  <td className="py-5 pl-2">
-                    <input 
-                      placeholder="Örn: Padlock c/w Keys" 
-                      value={item.description}
-                      onChange={(e) => handleInputChange(index, 'description', e.target.value)}
-                      className="w-full bg-transparent outline-none font-semibold text-slate-700 placeholder:text-slate-300" 
-                    />
-                  </td>
-                  <td className="py-5 text-center">
-                    <input 
-                      type="number" 
-                      min="1"
-                      value={item.qty}
-                      onChange={(e) => handleInputChange(index, 'qty', parseInt(e.target.value) || 0)}
-                      className="w-20 text-center bg-slate-100/50 rounded-xl p-2 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" 
-                    />
-                  </td>
-                  <td className="py-5 text-right">
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={item.unit_price}
-                      onChange={(e) => handleInputChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                      className="w-32 text-right bg-slate-100/50 rounded-xl p-2 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" 
-                    />
-                  </td>
-                  <td className="py-5 text-right font-black text-slate-800">
-                    ₺{(item.qty * item.unit_price).toLocaleString()}
-                  </td>
-                  <td className="py-5 text-right pr-2">
-                    <button 
-                      onClick={() => removeRow(index)} 
-                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-          <button 
-            onClick={addRow} 
-            className="group flex items-center gap-2 text-blue-600 font-bold text-sm hover:text-blue-800 transition-all bg-blue-50 px-6 py-3 rounded-2xl"
-          >
-            <Plus size={18} className="group-hover:rotate-90 transition-transform" /> Yeni Satır Ekle
-          </button>
-
-          <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-end">
-            <div className="space-y-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Para Birimi</span>
-              <div className="px-4 py-2 bg-slate-100 rounded-lg font-bold text-slate-600 inline-block text-sm">KZT (Kazakistan Tengesi)</div>
+      {/* --- GELİŞMİŞ ÇOKLU ÜRÜN MODAL --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-4xl p-10 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center mb-10 border-b pb-6">
+              <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Purchase Requisition</h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400"><X size={28} /></button>
             </div>
             
-            <div className="flex items-center gap-10">
-              <div className="text-right">
-                <span className="text-slate-400 font-black uppercase text-[10px] tracking-widest block mb-1">Genel Toplam</span>
-                <span className="text-4xl font-black text-slate-900 tracking-tighter">
-                  {calculateTotal().toLocaleString()} <span className="text-lg text-slate-400 font-medium">KZT</span>
-                </span>
+            <form onSubmit={handleSaveOrder} className="space-y-8">
+              <div className="w-1/2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Tedarikçi Firması</label>
+                <input required placeholder="Örn: KAZ Industrial Services" value={supplierName} onChange={e => setSupplierName(e.target.value)} className="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none mt-1 font-bold" />
               </div>
-              <button 
-                className="bg-[#0F172A] text-white px-10 py-5 rounded-[1.5rem] font-black flex items-center gap-3 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95"
-              >
-                <Save size={22} /> KAYDET VE ONAYLA
+
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                    <th className="pb-4 text-left">Ürün Açıklaması</th>
+                    <th className="pb-4 text-center w-24">Miktar</th>
+                    <th className="pb-4 text-right w-32">Birim Fiyat</th>
+                    <th className="pb-4 text-right w-12"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {items.map((item, index) => (
+                    <tr key={index}>
+                      <td className="py-4"><input required placeholder="Ürün adı..." value={item.description} onChange={e => handleItemChange(index, 'description', e.target.value)} className="w-full bg-transparent outline-none font-medium" /></td>
+                      <td className="py-4 text-center"><input type="number" value={item.qty} onChange={e => handleItemChange(index, 'qty', parseInt(e.target.value))} className="w-16 text-center bg-slate-50 rounded-lg p-2 font-bold" /></td>
+                      <td className="py-4 text-right"><input type="number" value={item.unit_price} onChange={e => handleItemChange(index, 'unit_price', parseFloat(e.target.value))} className="w-28 text-right bg-slate-50 rounded-lg p-2 font-bold" /></td>
+                      <td className="py-4 text-right"><button type="button" onClick={() => removeRow(index)} className="text-red-300 hover:text-red-600"><Trash2 size={18} /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <button type="button" onClick={addRow} className="flex items-center gap-2 text-blue-600 font-bold text-sm bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all">
+                <Plus size={18} /> Yeni Satır Ekle
               </button>
-            </div>
+
+              <div className="flex justify-between items-center pt-10 border-t">
+                <div className="text-2xl font-black text-slate-800">
+                  <span className="text-sm text-slate-400 uppercase mr-3">Toplam:</span>
+                  {calculateTotal().toLocaleString()} KZT
+                </div>
+                <button disabled={loading} className="bg-[#0F172A] text-white px-12 py-5 rounded-2xl font-black shadow-xl hover:bg-blue-600 transition-all">
+                  {loading ? 'KAYDEDİLİYOR...' : 'KAYDET VE ONAYLA'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </main>
   );
 }

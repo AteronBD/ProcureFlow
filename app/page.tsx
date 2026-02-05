@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import './globals.css';
 import { 
   Package, Truck, Bell, BarChart3, Building2, Clock, 
   AlertTriangle, CheckCircle, XCircle, ChevronRight, 

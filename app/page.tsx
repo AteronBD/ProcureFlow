@@ -1,3 +1,4 @@
+"use client";
 import React, { useState } from 'react';
 import { 
   Package, Truck, Bell, BarChart3, Building2, Clock, 

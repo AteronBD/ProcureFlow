@@ -8,8 +8,9 @@
     "start": "next start",
     "lint": "next lint"
   },
-  "dependencies": {
+"dependencies": {
     "@tailwindcss/postcss": "^4.0.0",
+    "autoprefixer": "latest",
     "react": "latest",
     "react-dom": "latest",
     "next": "latest",

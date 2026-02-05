@@ -2,7 +2,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { ArrowUpRight, DollarSign, Package, BarChart3 } from 'lucide-react';
+import { 
+  ArrowUpRight, DollarSign, Package, 
+  BarChart3, Clock, CheckCircle, TrendingUp, ShoppingCart 
+} from 'lucide-react';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0 });

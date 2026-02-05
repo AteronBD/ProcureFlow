@@ -1,116 +1,138 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Package, Clock, X, Trash2, Check } from 'lucide-react';
+import { Plus, Trash2, Save, X, ShoppingBag } from 'lucide-react';
 
-export default function OrdersPage() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export default function OrderCreatePage() {
+  // Sadece gerekli alanlar kaldı: Açıklama, Adet ve Birim Fiyat
+  const [items, setItems] = useState([{ description: '', qty: 1, unit_price: 0 }]);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ order_no: '', supplier: '', item: '', amount: '' });
 
-  useEffect(() => { fetchOrders(); }, []);
+  const addRow = () => {
+    setItems([...items, { description: '', qty: 1, unit_price: 0 }]);
+  };
 
-  async function fetchOrders() {
-    const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-    if (!error) setOrders(data);
-  }
-
-  const openNewOrderModal = () => {
-    const lastOrder = orders[0];
-    let nextNo = "ORD-101";
-    if (lastOrder && lastOrder.order_no.includes('-')) {
-      const lastNum = parseInt(lastOrder.order_no.split('-')[1]);
-      nextNo = `ORD-${lastNum + 1}`;
+  const removeRow = (index: number) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index));
     }
-    setFormData({ order_no: nextNo, supplier: '', item: '', amount: '' });
-    setIsModalOpen(true);
   };
 
-  const handleCreateOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.from('orders').insert([{ ...formData, status: 'Beklemede', amount: `₺${formData.amount}` }]);
-    if (!error) { setIsModalOpen(false); fetchOrders(); }
-    setLoading(false);
+  const handleInputChange = (index: number, field: string, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
   };
 
-  const updateStatus = async (id: string, newStatus: string) => {
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id);
-    if (!error) fetchOrders();
-  };
-
-  const deleteOrder = async (id: string) => {
-    if(!confirm('Silmek istediğinize emin misiniz?')) return;
-    const { error } = await supabase.from('orders').delete().eq('id', id);
-    if (!error) fetchOrders();
+  const calculateTotal = () => {
+    return items.reduce((acc, curr) => acc + (curr.qty * curr.unit_price), 0);
   };
 
   return (
-    <main className="p-8 space-y-8 text-left">
-      <header className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-800">Sipariş Yönetimi</h1>
-          <p className="text-slate-500">Sipariş akışını buradan kontrol edin.</p>
+    <main className="p-8 space-y-6 text-left animate-in fade-in duration-700">
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 relative overflow-hidden">
+        {/* Dekoratif Arka Plan İkonu */}
+        <div className="absolute right-[-30px] top-[-30px] opacity-[0.03] text-slate-900 rotate-12">
+          <ShoppingBag size={300} />
         </div>
-        <button onClick={openNewOrderModal} className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 shadow-lg transition-all">
-          + Yeni Sipariş
-        </button>
-      </header>
-      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left font-sans">
-          <thead className="bg-slate-50/50 uppercase text-[10px] font-black tracking-widest text-slate-400">
-            <tr>
-              <th className="p-6 pl-8">No</th>
-              <th className="p-6">Detay</th>
-              <th className="p-6">Durum</th>
-              <th className="p-6 text-right pr-8">İşlem</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {orders.map((order) => (
-              <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="p-6 pl-8 font-bold text-blue-600">{order.order_no}</td>
-                <td className="p-6">
-                  <div className="font-bold text-slate-800">{order.supplier}</div>
-                  <div className="text-xs text-slate-400">{order.item} — {order.amount}</div>
-                </td>
-                <td className="p-6">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${order.status === 'Onaylandı' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {order.status}
-                  </span>
-                </td>
-                <td className="p-6 text-right pr-8 space-x-2">
-                  {order.status === 'Beklemede' && (
-                    <button onClick={() => updateStatus(order.id, 'Onaylandı')} className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all"><Check size={16} /></button>
-                  )}
-                  <button onClick={() => deleteOrder(order.id)} className="p-2 bg-red-50 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-slate-800">Yeni Sipariş</h2>
-              <button onClick={() => setIsModalOpen(false)}><X size={24} className="text-slate-400" /></button>
+        <div className="relative z-10">
+          <div className="flex justify-between items-center mb-10 border-b border-slate-50 pb-6">
+            <div>
+              <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Satın Alma Talebi</h2>
+              <p className="text-slate-400 font-medium text-sm mt-1">Sipariş kalemlerini aşağıya ekleyin.</p>
             </div>
-            <form onSubmit={handleCreateOrder} className="space-y-4">
-              <input readOnly value={formData.order_no} className="w-full p-4 bg-slate-50 rounded-2xl font-mono text-sm" />
-              <input required placeholder="Tedarikçi" value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
-              <input required placeholder="Ürün" value={formData.item} onChange={e => setFormData({...formData, item: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
-              <input type="number" required placeholder="Tutar" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
-              <button disabled={loading} className="w-full bg-blue-600 text-white p-5 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg">
-                {loading ? 'KAYDEDİLİYOR...' : 'SİPARİŞİ OLUŞTUR'}
+            <div className="text-right">
+              <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Talep Numarası</span>
+              <span className="text-xl font-mono font-bold text-blue-600">PR-1481</span>
+            </div>
+          </div>
+
+          {/* Ürün Tablosu */}
+          <table className="w-full mb-8">
+            <thead>
+              <tr className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
+                <th className="pb-5 text-left pl-2">Ürün / Hizmet Açıklaması</th>
+                <th className="pb-5 text-center w-32">Miktar</th>
+                <th className="pb-5 text-right w-40">Birim Fiyat</th>
+                <th className="pb-5 text-right w-40">Toplam</th>
+                <th className="pb-5 text-right pr-2 w-20"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {items.map((item, index) => (
+                <tr key={index} className="group hover:bg-slate-50/50 transition-colors">
+                  <td className="py-5 pl-2">
+                    <input 
+                      placeholder="Örn: Padlock c/w Keys" 
+                      value={item.description}
+                      onChange={(e) => handleInputChange(index, 'description', e.target.value)}
+                      className="w-full bg-transparent outline-none font-semibold text-slate-700 placeholder:text-slate-300" 
+                    />
+                  </td>
+                  <td className="py-5 text-center">
+                    <input 
+                      type="number" 
+                      min="1"
+                      value={item.qty}
+                      onChange={(e) => handleInputChange(index, 'qty', parseInt(e.target.value) || 0)}
+                      className="w-20 text-center bg-slate-100/50 rounded-xl p-2 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </td>
+                  <td className="py-5 text-right">
+                    <input 
+                      type="number" 
+                      placeholder="0"
+                      value={item.unit_price}
+                      onChange={(e) => handleInputChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                      className="w-32 text-right bg-slate-100/50 rounded-xl p-2 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </td>
+                  <td className="py-5 text-right font-black text-slate-800">
+                    ₺{(item.qty * item.unit_price).toLocaleString()}
+                  </td>
+                  <td className="py-5 text-right pr-2">
+                    <button 
+                      onClick={() => removeRow(index)} 
+                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <button 
+            onClick={addRow} 
+            className="group flex items-center gap-2 text-blue-600 font-bold text-sm hover:text-blue-800 transition-all bg-blue-50 px-6 py-3 rounded-2xl"
+          >
+            <Plus size={18} className="group-hover:rotate-90 transition-transform" /> Yeni Satır Ekle
+          </button>
+
+          <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-end">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Para Birimi</span>
+              <div className="px-4 py-2 bg-slate-100 rounded-lg font-bold text-slate-600 inline-block text-sm">KZT (Kazakistan Tengesi)</div>
+            </div>
+            
+            <div className="flex items-center gap-10">
+              <div className="text-right">
+                <span className="text-slate-400 font-black uppercase text-[10px] tracking-widest block mb-1">Genel Toplam</span>
+                <span className="text-4xl font-black text-slate-900 tracking-tighter">
+                  {calculateTotal().toLocaleString()} <span className="text-lg text-slate-400 font-medium">KZT</span>
+                </span>
+              </div>
+              <button 
+                className="bg-[#0F172A] text-white px-10 py-5 rounded-[1.5rem] font-black flex items-center gap-3 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95"
+              >
+                <Save size={22} /> KAYDET VE ONAYLA
               </button>
-            </form>
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </main>
   );
 }
